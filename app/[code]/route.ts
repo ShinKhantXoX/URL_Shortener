@@ -12,21 +12,29 @@ export async function GET(
 ) {
   const { code } = await params;
 
-  const { data, error } = await supabase
-    .from("urls")
-    .select("id, original_url")
-    .eq("short_code", code)
-    .single();
+  const { data, error } = await supabase.rpc("get_url_by_code", {
+  p_short_code: code,
+});
 
-  if (error || !data) {
-    return new NextResponse("Short URL not found", {
-      status: 404,
-    });
-  }
+if (error) {
+  console.error("URL lookup error:", error);
 
-  await supabase.rpc("increment_url_clicks", {
-    url_id: data.id,
+  return new NextResponse("Short URL not found", {
+    status: 404,
   });
+}
 
-  return NextResponse.redirect(data.original_url, 302);
+if (!data?.length) {
+  return new NextResponse("Short URL not found", {
+    status: 404,
+  });
+}
+
+const url = data[0];
+
+await supabase.rpc("increment_url_clicks", {
+  url_id: url.id,
+});
+
+return NextResponse.redirect(url.original_url, 302);
 }
