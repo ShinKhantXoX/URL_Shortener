@@ -1,7 +1,6 @@
 "use client"
 import { useState, useCallback, useEffect } from "react";
 import { Copy, Check, Trash2, ExternalLink, BarChart2, Clock } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { createClient } from "@/lib/supabase/client";
 
 type ShortenedLink = {
@@ -134,12 +133,84 @@ export default function App() {
     });
   }, []);
 
-  const handleDelete = useCallback((id: string) => {
-    setLinks((prev) => prev.filter((l) => l.id !== id));
-    if (latestId === id) setLatestId(null);
-  }, [latestId]);
-  
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const supabase = createClient();
+
+      const { error } = await supabase
+        .from("urls")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Failed to delete link:", error);
+        setError("Failed to delete short URL.");
+        return;
+      }
+
+      setLinks((prev) => prev.filter((link) => link.id !== id));
+
+      if (latestId === id) {
+        setLatestId(null);
+      }
+    },
+    [latestId]
+  );
+
+  const handleClearAll = async () => {
+    const supabase = createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("urls")
+      .delete()
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Failed to clear links:", error);
+      setError("Failed to clear links.");
+      return;
+    }
+
+    setLinks([]);
+    setLatestId(null);
+  };
+    
   const latest = links.find((l) => l.id === latestId);
+
+  useEffect(() => {
+  const supabase = createClient();
+
+  const loadLinks = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setLinks([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("urls")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to load links:", error);
+      return;
+    }
+
+    setLinks((data ?? []).map(mapLink));
+  };
+
+  loadLinks();
+}, []);
 
   return (
     <div
@@ -241,7 +312,7 @@ export default function App() {
                 Recent Links — {links.length}
               </p>
               <button
-                onClick={() => { setLinks([]); setLatestId(null); }}
+                onClick={handleClearAll}
                 className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-destructive transition-colors duration-150"
               >
                 Clear all
