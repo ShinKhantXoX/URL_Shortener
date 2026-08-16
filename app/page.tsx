@@ -31,7 +31,7 @@ function mapLink(row: SupabaseUrl): ShortenedLink {
   };
 }
 
-const DOMAIN = "lnk.sh";
+const DOMAIN = "url-shortener-eta-eosin.vercel.app";
 
 function generateCode(): string {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
