@@ -1,7 +1,8 @@
 "use client"
 import { useState, useCallback, useEffect } from "react";
-import { Copy, Check, Link2, Trash2, ExternalLink, BarChart2, Clock, Zap } from "lucide-react";
+import { Copy, Check, Trash2, ExternalLink, BarChart2, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 type ShortenedLink = {
   id: string;
@@ -20,7 +21,7 @@ type SupabaseUrl = {
   created_at: string;
 };
 
-function mapLink(row: SupabaseUrl): ShortenedLink {
+export function mapLink(row: SupabaseUrl): ShortenedLink {
   return {
     id: row.id,
     originalUrl: row.original_url,
@@ -31,7 +32,7 @@ function mapLink(row: SupabaseUrl): ShortenedLink {
   };
 }
 
-const DOMAIN = "url-shortener-eta-eosin.vercel.app";
+export const DOMAIN = "url-shortener-eta-eosin.vercel.app";
 
 function generateCode(): string {
   const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -88,11 +89,23 @@ export default function App() {
 
     const code = generateCode();
 
+    const supabase = createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError("Please sign in with Google first.");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("urls")
       .insert({
         original_url: trimmed,
         short_code: code,
+        user_id: user.id,
       })
       .select("*")
       .single();
@@ -125,62 +138,14 @@ export default function App() {
     setLinks((prev) => prev.filter((l) => l.id !== id));
     if (latestId === id) setLatestId(null);
   }, [latestId]);
-
-  const totalClicks = links.reduce((s, l) => s + l.clicks, 0);
+  
   const latest = links.find((l) => l.id === latestId);
-
-useEffect(() => {
-  let cancelled = false;
-
-  async function fetchLinks() {
-    const { data, error } = await supabase
-      .from("urls")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (cancelled) return;
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    setLinks((data ?? []).map(mapLink));
-  }
-
-  fetchLinks();
-
-  return () => {
-    cancelled = true;
-  };
-}, []);
 
   return (
     <div
       className="min-h-screen w-full bg-background text-foreground flex flex-col"
       style={{ fontFamily: "'JetBrains Mono', monospace" }}
     >
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 md:px-10 py-5 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 bg-primary flex items-center justify-center">
-            <Link2 size={11} className="text-background" strokeWidth={2.5} />
-          </div>
-          <span className="text-sm font-semibold tracking-widest uppercase text-foreground">
-            {DOMAIN}
-          </span>
-        </div>
-        <div className="flex items-center gap-6 text-xs text-muted-foreground">
-          <span className="hidden md:flex items-center gap-1.5">
-            <BarChart2 size={11} className="text-primary" />
-            {links.length} links
-          </span>
-          <span className="hidden md:flex items-center gap-1.5">
-            <Zap size={11} className="text-primary" />
-            {totalClicks} clicks
-          </span>
-        </div>
-      </header>
 
       {/* Main */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 md:py-0">
