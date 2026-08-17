@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/Header";
+import dynamic from "next/dynamic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "Shin URL Shortener",
   description: "Effortlessly convert long URLs into short, shareable links with one-click copying, perfect for users seeking convenience and efficiency in link management.",
 };
+
+const Header = dynamic(() => import('../components/Header'), {
+  ssr: true, // optional: enable/disable SSR
+})
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

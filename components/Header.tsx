@@ -96,7 +96,7 @@ export const Header = () => {
   };
 
   return (
-    <header className="flex items-center justify-between px-6 md:px-10 py-5 border-b border-border">
+    <header className="flex items-center justify-between px-6 md:px-10 py-5 border-b border-border/20 fixed top-0 z-50 w-full backdrop-blur-xl bg-background/80">
       <div className="flex items-center gap-2.5">
         <div className="w-5 h-5 bg-primary flex items-center justify-center">
           <Link2
@@ -143,3 +143,5 @@ export const Header = () => {
     </header>
   );
 };
+
+export default Header;
