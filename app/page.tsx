@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Copy, Check, Trash2, ExternalLink, BarChart2, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { DotPattern } from "@/components/DotPattern";
 
 type ShortenedLink = {
   id: string;
@@ -214,14 +215,21 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen w-full bg-background text-foreground flex flex-col"
+      className=" min-h-screen w-full bg-background text-foreground flex flex-col"
       style={{ fontFamily: "'JetBrains Mono', monospace" }}
     >
-
       {/* Main */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 md:py-0">
-        <div className="w-full max-w-2xl space-y-10">
+        <DotPattern
+          dotSize={2}
+          gap={32}
+          baseColor="#ffffff"
+          glowColor="#adff2f"
+          proximity={150}
+          className="!bg-transparent absolute inset-0 z-0"
+        />
 
+        <div className=" relative w-full max-w-2xl space-y-10">
           {/* Hero label */}
           <div className="space-y-2">
             <p className="text-xs tracking-[0.25em] uppercase text-primary font-medium">
@@ -231,20 +239,22 @@ export default function App() {
               className="text-3xl md:text-5xl font-bold leading-tight text-foreground"
               style={{ letterSpacing: "-0.02em" }}
             >
-              Compress.<br />
+              Compress.
+              <br />
               <span className="text-primary">Share.</span>
             </h1>
           </div>
 
           {/* Input area */}
           <div className="space-y-3">
-            <div
-              className="flex items-stretch border border-border bg-card transition-all duration-200 focus-within:border-primary/60"
-            >
+            <div className="flex items-stretch border border-border bg-card transition-all duration-200 focus-within:border-primary/60">
               <input
                 type="url"
                 value={inputUrl}
-                onChange={(e) => { setInputUrl(e.target.value); setError(""); }}
+                onChange={(e) => {
+                  setInputUrl(e.target.value);
+                  setError("");
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleShorten()}
                 placeholder="https://your-very-long-url.com/goes/here"
                 className="flex-1 bg-transparent px-4 py-4 text-sm text-foreground placeholder:text-muted-foreground outline-none"
@@ -260,7 +270,9 @@ export default function App() {
                     <span className="inline-block w-3 h-3 border border-background/40 border-t-background rounded-full animate-spin" />
                     Shortening
                   </span>
-                ) : "Shorten →"}
+                ) : (
+                  "Shorten →"
+                )}
               </button>
             </div>
 
@@ -288,13 +300,19 @@ export default function App() {
                   </p>
                 </div>
                 <button
-                  onClick={() => handleCopy(latest.shortUrl, latest.id + "-hero")}
+                  onClick={() =>
+                    handleCopy(latest.shortUrl, latest.id + "-hero")
+                  }
                   className="flex items-center gap-2 px-4 py-2.5 bg-primary text-background text-xs font-bold uppercase tracking-widest hover:bg-[#c8ff5a] active:scale-[0.98] transition-all duration-150 shrink-0"
                 >
                   {copied === latest.id + "-hero" ? (
-                    <><Check size={12} strokeWidth={3} /> Copied</>
+                    <>
+                      <Check size={12} strokeWidth={3} /> Copied
+                    </>
                   ) : (
-                    <><Copy size={12} strokeWidth={2.5} /> Copy</>
+                    <>
+                      <Copy size={12} strokeWidth={2.5} /> Copy
+                    </>
                   )}
                 </button>
               </div>
@@ -305,7 +323,7 @@ export default function App() {
 
       {/* History panel */}
       {links.length > 0 && (
-        <section className="border-t border-border px-4 pb-8 pt-6">
+        <section className="border-t border-border/20 px-4 pb-8 pt-6 w-[300px] md:w-[600px] mx-auto bg-background/70 backdrop-blur-md relative z-10">
           <div className="max-w-2xl mx-auto space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-medium">
@@ -328,7 +346,7 @@ export default function App() {
                   {/* Short URL */}
                   <div className="min-w-0 flex-1 grid grid-cols-1 md:grid-cols-[180px_1fr] gap-1 md:gap-4 items-center">
                     <span className="text-sm font-semibold text-foreground truncate">
-                      {DOMAIN}/{link.shortCode}
+                      {truncate(DOMAIN, 10)}/{link.shortCode}
                     </span>
                     <span className="text-xs text-muted-foreground truncate hidden md:block">
                       {truncate(link.originalUrl, 48)}
@@ -353,7 +371,11 @@ export default function App() {
                       className="p-1.5 text-muted-foreground hover:text-primary transition-colors duration-150"
                     >
                       {copied === link.id ? (
-                        <Check size={13} strokeWidth={3} className="text-primary" />
+                        <Check
+                          size={13}
+                          strokeWidth={3}
+                          className="text-primary"
+                        />
                       ) : (
                         <Copy size={13} strokeWidth={2} />
                       )}
