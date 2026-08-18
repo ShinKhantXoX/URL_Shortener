@@ -19,7 +19,7 @@ export default function GoogleLoginButton() {
       onClick={handleGoogleLogin}
       className="px-4 py-2 border rounded-md"
     >
-      Continue with Google
+      Sign in with Google
     </button>
   );
 }

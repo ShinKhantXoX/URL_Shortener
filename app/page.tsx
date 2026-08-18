@@ -51,6 +51,19 @@ function truncate(url: string, max = 52): string {
   return url.length > max ? url.slice(0, max) + "…" : url;
 }
 
+function getAnonymousSessionId(): string {
+  const key = "url_shortener_session_id";
+
+  let sessionId = sessionStorage.getItem(key);
+
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem(key, sessionId);
+  }
+
+  return sessionId;
+}
+
 export default function App() {
   const [inputUrl, setInputUrl] = useState("");
   const [links, setLinks] = useState<ShortenedLink[]>([]);
@@ -68,64 +81,159 @@ export default function App() {
     }
   };
 
+//   const handleShorten = useCallback(async () => {
+//   const trimmed = inputUrl.trim();
+
+//   if (!trimmed) {
+//     setError("Enter a URL to shorten.");
+//     return;
+//   }
+
+//   if (!isValidUrl(trimmed)) {
+//     setError("Please enter a valid URL (include https://).");
+//     return;
+//   }
+
+//   setError("");
+//   setLoading(true);
+
+//   try {
+//     await new Promise((r) => setTimeout(r, 600));
+
+//     const code = generateCode();
+
+//     const supabase = createClient();
+
+//     const {
+//       data: { user },
+//     } = await supabase.auth.getUser();
+
+//     if (!user) {
+//       setError("Please sign in with Google first.");
+//       return;
+//     }
+
+//     const { data, error } = await supabase
+//       .from("urls")
+//       .insert({
+//         original_url: trimmed,
+//         short_code: code,
+//         user_id: user.id,
+//       })
+//       .select("*")
+//       .single();
+
+//     if (error) {
+//       throw error;
+//     }
+
+//     const newLink = mapLink(data);
+
+//     setLinks((prev) => [newLink, ...prev]);
+//     setLatestId(newLink.id);
+//     setInputUrl("");
+//   } catch (error) {
+//     console.error(error);
+//     setError("Failed to create short URL.");
+//   } finally {
+//     setLoading(false);
+//   }
+// }, [inputUrl]);
+
   const handleShorten = useCallback(async () => {
-  const trimmed = inputUrl.trim();
+    const trimmed = inputUrl.trim();
 
-  if (!trimmed) {
-    setError("Enter a URL to shorten.");
-    return;
-  }
-
-  if (!isValidUrl(trimmed)) {
-    setError("Please enter a valid URL (include https://).");
-    return;
-  }
-
-  setError("");
-  setLoading(true);
-
-  try {
-    await new Promise((r) => setTimeout(r, 600));
-
-    const code = generateCode();
-
-    const supabase = createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Please sign in with Google first.");
+    if (!trimmed) {
+      setError("Enter a URL to shorten.");
       return;
     }
 
-    const { data, error } = await supabase
-      .from("urls")
-      .insert({
-        original_url: trimmed,
-        short_code: code,
-        user_id: user.id,
-      })
-      .select("*")
-      .single();
-
-    if (error) {
-      throw error;
+    if (!isValidUrl(trimmed)) {
+      setError("Please enter a valid URL (include https://).");
+      return;
     }
 
-    const newLink = mapLink(data);
+    setError("");
+    setLoading(true);
 
-    setLinks((prev) => [newLink, ...prev]);
-    setLatestId(newLink.id);
-    setInputUrl("");
-  } catch (error) {
-    console.error(error);
-    setError("Failed to create short URL.");
-  } finally {
-    setLoading(false);
-  }
-}, [inputUrl]);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+
+      const code = generateCode();
+      const supabase = createClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let data;
+
+      if (user) {
+        // =========================
+        // AUTHENTICATED USER
+        // =========================
+
+        const result = await supabase
+          .from("urls")
+          .insert({
+            original_url: trimmed,
+            short_code: code,
+            user_id: user.id,
+            anonymous_session_id: null,
+            expires_at: null,
+          })
+          .select("*")
+          .single();
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        data = result.data;
+      } else {
+        // =========================
+        // PUBLIC USER
+        // =========================
+
+        const sessionId = getAnonymousSessionId();
+
+        const result = await supabase.rpc("create_public_url", {
+          p_original_url: trimmed,
+          p_short_code: code,
+          p_session_id: sessionId,
+        });
+
+        if (result.error) {
+          if (
+            result.error.message.includes(
+              "PUBLIC_URL_LIMIT_REACHED"
+            )
+          ) {
+            setError(
+              "You can create up to 5 public links per session. Sign in with Google to create more."
+            );
+
+            return;
+          }
+
+          throw result.error;
+        }
+
+        data = result.data;
+      }
+
+      const newLink = mapLink(data);
+
+      setLinks((prev) => [newLink, ...prev]);
+      setLatestId(newLink.id);
+      setInputUrl("");
+    } catch (error) {
+      console.error(error);
+      setError("Failed to create short URL.");
+    } finally {
+      setLoading(false);
+    }
+  }, [inputUrl]);
 
   const handleCopy = useCallback((text: string, id: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -165,19 +273,24 @@ export default function App() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) return;
+    if (user) {
+      const { error } = await supabase
+        .from("urls")
+        .delete()
+        .eq("user_id", user.id);
 
-    const { error } = await supabase
-      .from("urls")
-      .delete()
-      .eq("user_id", user.id);
+      if (error) {
+        console.error(error);
+        setError("Failed to clear links.");
+        return;
+      }
 
-    if (error) {
-      console.error("Failed to clear links:", error);
-      setError("Failed to clear links.");
+      setLinks([]);
+      setLatestId(null);
       return;
     }
 
+    // Public links
     setLinks([]);
     setLatestId(null);
   };
@@ -185,33 +298,64 @@ export default function App() {
   const latest = links.find((l) => l.id === latestId);
 
   useEffect(() => {
-  const supabase = createClient();
+    const supabase = createClient();
 
-  const loadLinks = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const loadLinks = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    if (!user) {
-      setLinks([]);
-      return;
-    }
+      if (user) {
+        // =========================
+        // AUTHENTICATED LINKS
+        // =========================
 
-    const { data, error } = await supabase
-      .from("urls")
-      .select("*")
-      .order("created_at", { ascending: false });
+        const { data, error } = await supabase
+          .from("urls")
+          .select("*")
+          .order("created_at", {
+            ascending: false,
+          });
 
-    if (error) {
-      console.error("Failed to load links:", error);
-      return;
-    }
+        if (error) {
+          console.error("Failed to load links:", error);
+          return;
+        }
 
-    setLinks((data ?? []).map(mapLink));
-  };
+        setLinks((data ?? []).map(mapLink));
+        return;
+      }
 
-  loadLinks();
-}, []);
+      // =========================
+      // PUBLIC LINKS
+      // =========================
+
+      const sessionId = sessionStorage.getItem(
+        "url_shortener_session_id"
+      );
+
+      if (!sessionId) {
+        setLinks([]);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc(
+        "get_public_links",
+        {
+          p_session_id: sessionId,
+        }
+      );
+
+      if (error) {
+        console.error("Failed to load public links:", error);
+        return;
+      }
+
+      setLinks((data ?? []).map(mapLink));
+    };
+
+    loadLinks();
+  }, []);
 
   return (
     <div
@@ -286,32 +430,37 @@ export default function App() {
 
           {/* Latest result spotlight */}
           {latest && (
-            <div className="border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="border border-primary/20 bg-background/20 backdrop-blur-md p-4 space-y-3 rounded-lg shadow-lg shadow-black/5">
               <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">
                 ✓ Shortened
               </p>
+
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <p className="text-lg font-bold text-primary tracking-tight">
                     {latest.shortUrl}
                   </p>
+
                   <p className="text-xs text-muted-foreground truncate">
                     {truncate(latest.originalUrl)}
                   </p>
                 </div>
+
                 <button
                   onClick={() =>
                     handleCopy(latest.shortUrl, latest.id + "-hero")
                   }
-                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-background text-xs font-bold uppercase tracking-widest hover:bg-[#c8ff5a] active:scale-[0.98] transition-all duration-150 shrink-0"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-background text-xs font-bold uppercase tracking-widest hover:bg-[#c8ff5a] active:scale-[0.98] transition-all duration-150 shrink-0 rounded-md"
                 >
                   {copied === latest.id + "-hero" ? (
                     <>
-                      <Check size={12} strokeWidth={3} /> Copied
+                      <Check size={12} strokeWidth={3} />
+                      Copied
                     </>
                   ) : (
                     <>
-                      <Copy size={12} strokeWidth={2.5} /> Copy
+                      <Copy size={12} strokeWidth={2.5} />
+                      Copy
                     </>
                   )}
                 </button>
