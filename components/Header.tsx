@@ -107,7 +107,7 @@ export const Header = () => {
         </div>
 
         <span className="text-sm font-semibold tracking-widest uppercase text-foreground">
-          Shin Shortener
+          URL Shortener
         </span>
       </div>
 
